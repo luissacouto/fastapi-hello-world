@@ -10,6 +10,12 @@ jobs:
       - name: 'Checkout GitHub Action'
         uses: actions/checkout@main
 
+      # Install Docker Compose
+      - name: 'Install Docker Compose'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y docker-compose
+
       # Login to Azure CLI
       - name: 'Login via Azure CLI'
         uses: azure/login@v1

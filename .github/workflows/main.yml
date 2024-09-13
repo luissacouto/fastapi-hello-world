@@ -1,6 +1,5 @@
 on: [push]
-name: Linux_Container_Workflow
-
+name: PythonAppAzureDeployment
 jobs:
     build-and-deploy:
         runs-on: ubuntu-latest
@@ -23,7 +22,7 @@ jobs:
         - run: |
             docker build . -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
             docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
-
+        
         - name: 'Deploy to Azure Container Instances'
           uses: 'azure/aci-deploy@v1'
           with:
@@ -33,5 +32,5 @@ jobs:
             registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
             registry-username: ${{ secrets.REGISTRY_USERNAME }}
             registry-password: ${{ secrets.REGISTRY_PASSWORD }}
-            name: aci-sampleapp
-            location: 'west us'
+            name: fastapi-sampleapp
+            location: 'west europe'

@@ -26,14 +26,38 @@ jobs:
           docker build . -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
 
-      # Step 4: Push PostgreSQL image to Azure Container Registry (ACR)
-      - name: 'Pull PostgreSQL image and push to ACR'
+      # Step 4: Check if PostgreSQL instance already exists (skip if yes)
+      - name: 'Check for PostgreSQL Instance'
+        id: check_postgres
         run: |
-          docker pull postgres:13
-          docker tag postgres:13 ${{ secrets.REGISTRY_LOGIN_SERVER }}/postgres:13
-          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/postgres:13
+          az container show --name postgres-instance --resource-group ${{ secrets.RESOURCE_GROUP }} --output json || echo "NotFound"
 
-      # Step 5: Deploy FastAPI App to Azure Container Instances
+      # Step 5: Deploy PostgreSQL to Azure Container Instances only if not already running
+      - name: 'Deploy PostgreSQL to Azure Container Instances'
+        if: steps.check_postgres.outputs.result == 'NotFound'
+        uses: 'azure/aci-deploy@v1'
+        with:
+          resource-group: ${{ secrets.RESOURCE_GROUP }}
+          dns-name-label: postgres-instance
+          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/postgres:13  # Using image from ACR
+          registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          registry-username: ${{ secrets.REGISTRY_USERNAME }}
+          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+          name: postgres-instance
+          location: 'west europe'
+          environment-variables: |
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          ports: '5432'
+          volumes: |
+            volume-name=postgres-data
+            mount-path=/var/lib/postgresql/data
+            share-name=postgresdata
+            storage-account-name=${{ secrets.STORAGE_ACCOUNT }}
+            storage-account-key=${{ secrets.STORAGE_ACCOUNT_KEY }}
+
+      # Step 6: Deploy FastAPI App to Azure Container Instances
       - name: 'Deploy FastAPI App to Azure Container Instances'
         uses: 'azure/aci-deploy@v1'
         with:
@@ -46,25 +70,7 @@ jobs:
           name: fastapi-sampleapp
           location: 'west europe'
           environment-variables: |
-            DB_HOST=postgres-${{ github.run_number }}
+            DB_HOST=postgres-instance
             DB_USER=${{ secrets.POSTGRES_USER }}
             DB_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             DB_NAME=${{ secrets.POSTGRES_DB }}
-
-      # Step 6: Deploy PostgreSQL to Azure Container Instances from ACR
-      - name: 'Deploy PostgreSQL to Azure Container Instances'
-        uses: 'azure/aci-deploy@v1'
-        with:
-          resource-group: ${{ secrets.RESOURCE_GROUP }}
-          dns-name-label: postgres-${{ github.run_number }}
-          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/postgres:13  # Using image from ACR
-          registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-          registry-username: ${{ secrets.REGISTRY_USERNAME }}
-          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
-          name: postgres-${{ github.run_number }}
-          location: 'west europe'
-          environment-variables: |
-            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
-          ports: '5432'

@@ -14,8 +14,8 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Step 3: Build and push FastAPI image to Azure Container Registry
-      - name: 'Build and push image'
+      # Step 3: Build and push FastAPI image to Azure Container Registry (ACR)
+      - name: 'Build and push FastAPI image'
         uses: azure/docker-login@v1
         with:
           login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
@@ -26,7 +26,14 @@ jobs:
           docker build . -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
           docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
 
-      # Step 4: Deploy FastAPI App to Azure Container Instances
+      # Step 4: Push PostgreSQL image to Azure Container Registry (ACR)
+      - name: 'Pull PostgreSQL image and push to ACR'
+        run: |
+          docker pull postgres:13
+          docker tag postgres:13 ${{ secrets.REGISTRY_LOGIN_SERVER }}/postgres:13
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/postgres:13
+
+      # Step 5: Deploy FastAPI App to Azure Container Instances
       - name: 'Deploy FastAPI App to Azure Container Instances'
         uses: 'azure/aci-deploy@v1'
         with:
@@ -44,18 +51,16 @@ jobs:
             DB_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
             DB_NAME=${{ secrets.POSTGRES_DB }}
 
-      # Step 5: Docker Hub login (authentication to Docker Hub)
-      - name: 'Login to Docker Hub'
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login --username ${{ secrets.DOCKER_USERNAME }} --password-stdin
-
-      # Step 6: Deploy PostgreSQL to Azure Container Instances
+      # Step 6: Deploy PostgreSQL to Azure Container Instances from ACR
       - name: 'Deploy PostgreSQL to Azure Container Instances'
         uses: 'azure/aci-deploy@v1'
         with:
           resource-group: ${{ secrets.RESOURCE_GROUP }}
           dns-name-label: postgres-${{ github.run_number }}
-          image: postgres:13  # You can specify the version you want
-          registry-login-server: 'docker.io'
+          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/postgres:13  # Using image from ACR
+          registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          registry-username: ${{ secrets.REGISTRY_USERNAME }}
+          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
           name: postgres-${{ github.run_number }}
           location: 'west europe'
           environment-variables: |

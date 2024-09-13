@@ -1,10 +1,46 @@
-version: '3.8'
+version: '3'
 
 services:
+  db:
+    image: postgres:13
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydatabase
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
   backend:
     build:
-      context: ./  # The folder where your Dockerfile is located
-    container_name: fastapi_backend
-    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+      context: ./
+    container_name: fastapi_app
+    environment:
+      DATABASE_URL: postgresql://myuser:mypassword@db:5432/mydatabase
     ports:
       - "80:80"
+    depends_on:
+      - db
+    networks:
+      - app-network
+
+  # frontend:
+  #   build:
+  #     context: ./frontend
+  #   container_name: react_frontend
+  #   ports:
+  #     - "3000:3000"
+  #   depends_on:
+  #     - backend
+  #   networks:
+  #     - app-network
+
+volumes:
+  postgres_data:
+
+networks:
+  app-network:

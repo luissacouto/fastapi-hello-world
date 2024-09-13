@@ -1,36 +1,61 @@
 on: [push]
 name: PythonAppAzureDeployment
 jobs:
-    build-and-deploy:
-        runs-on: ubuntu-latest
-        steps:
-        # checkout the repo
-        - name: 'Checkout GitHub Action'
-          uses: actions/checkout@main
-          
-        - name: 'Login via Azure CLI'
-          uses: azure/login@v1
-          with:
-            creds: ${{ secrets.AZURE_CREDENTIALS }}
-        
-        - name: 'Build and push image'
-          uses: azure/docker-login@v1
-          with:
-            login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-            username: ${{ secrets.REGISTRY_USERNAME }}
-            password: ${{ secrets.REGISTRY_PASSWORD }}
-        - run: |
-            docker build . -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
-            docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
-        
-        - name: 'Deploy to Azure Container Instances'
-          uses: 'azure/aci-deploy@v1'
-          with:
-            resource-group: ${{ secrets.RESOURCE_GROUP }}
-            dns-name-label: ${{ secrets.RESOURCE_GROUP }}${{ github.run_number }}
-            image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
-            registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-            registry-username: ${{ secrets.REGISTRY_USERNAME }}
-            registry-password: ${{ secrets.REGISTRY_PASSWORD }}
-            name: fastapi-sampleapp
-            location: 'west europe'
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Checkout the repo
+      - name: 'Checkout GitHub Action'
+        uses: actions/checkout@main
+
+      # Step 2: Login to Azure CLI
+      - name: 'Login via Azure CLI'
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # Step 3: Build and push FastAPI image to the Azure Container Registry
+      - name: 'Build and push image'
+        uses: azure/docker-login@v1
+        with:
+          login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - run: |
+          docker build . -t ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
+          docker push ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
+
+      # Step 4: Deploy FastAPI App to Azure Container Instances
+      - name: 'Deploy FastAPI App to Azure Container Instances'
+        uses: 'azure/aci-deploy@v1'
+        with:
+          resource-group: ${{ secrets.RESOURCE_GROUP }}
+          dns-name-label: ${{ secrets.RESOURCE_GROUP }}${{ github.run_number }}
+          image: ${{ secrets.REGISTRY_LOGIN_SERVER }}/sampleapp:${{ github.sha }}
+          registry-login-server: ${{ secrets.REGISTRY_LOGIN_SERVER }}
+          registry-username: ${{ secrets.REGISTRY_USERNAME }}
+          registry-password: ${{ secrets.REGISTRY_PASSWORD }}
+          name: fastapi-sampleapp
+          location: 'west europe'
+          environment-variables: |
+            DB_HOST=postgres-${{ github.run_number }}
+            DB_USER=${{ secrets.POSTGRES_USER }}
+            DB_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            DB_NAME=${{ secrets.POSTGRES_DB }}
+
+      # Step 5: Deploy PostgreSQL to Azure Container Instances
+      - name: 'Deploy PostgreSQL to Azure Container Instances'
+        uses: 'azure/aci-deploy@v1'
+        with:
+          resource-group: ${{ secrets.RESOURCE_GROUP }}
+          dns-name-label: postgres-${{ github.run_number }}
+          image: postgres:13  # You can specify the version you want
+          registry-login-server: 'docker.io'
+          name: postgres-${{ github.run_number }}
+          location: 'west europe'
+          environment-variables: |
+            POSTGRES_USER=${{ secrets.POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+            POSTGRES_DB=${{ secrets.POSTGRES_DB }}
+          ports: '5432'

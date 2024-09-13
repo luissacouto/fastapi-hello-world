@@ -12,7 +12,16 @@ app = FastAPI(
 
 @app.get("/")
 def hello_world():
-    DATABASE_URL = os.getenv("DATABASE_URL")
     # engine = create_async_engine(DATABASE_URL, echo=True)
     # SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=AsyncSession)
-    return {"Hello": f"World - {DATABASE_URL}"}
+    print("############", flush=True)
+    print("############", flush=True)
+    print("############", flush=True)
+    print(os.getenv("DB_HOST"), flush=True)
+    print(os.getenv("DB_USER"), flush=True)
+    print(os.getenv("DB_PASSWORD"), flush=True)
+    print(os.getenv("DB_NAME"), flush=True)
+    print("############", flush=True)
+    print("############", flush=True)
+    print("############", flush=True)
+    return {"Hello": "World"}
